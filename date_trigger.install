@@ -1,0 +1,57 @@
+<?php
+// Developed by Dennis Stevense for Digital Deployment
+
+/**
+ * Implementation of hook_install().
+ */
+function date_trigger_install() {
+  drupal_install_schema('date_trigger');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function date_trigger_uninstall() {
+  drupal_uninstall_schema('date_trigger');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function date_trigger_schema() {
+  $schema = array();
+  
+  $schema['date_trigger_invocation'] = array(
+    'description' => 'The table that contains information about which events have been invoked already.',
+    'fields' => array(
+      'nid' => array(
+        'description' => 'A node identifier.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'field_name' => array(
+        'description' => 'A field name.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'date_value' => array(
+        'description' => 'The value in case of a date field.',
+        'type' => 'varchar',
+        'length' => 20,
+      ),
+      'datestamp_value' => array(
+        'description' => 'The value in case of a datestamp field.',
+        'type' => 'int',
+      ),
+      'datetime_value' => array(
+        'description' => 'The value in case of a datetime field.',
+        'type' => 'datetime',
+      ),
+    ),
+    'primary key' => array('nid', 'field_name'),
+  );
+  
+  return $schema;
+}

@@ -17,25 +17,43 @@ function date_trigger_cron() {
       if (!isset($database_info['table']) || !isset($database_info['columns']['value']['column'])) {
         continue;
       }
-
       $table = $database_info['table'];
       $column = $database_info['columns']['value']['column'];
-
+      
+      $field_name = $field['field_name'];
+      $field_type = $field['type'];
+      
+      switch ($field_type) {
+        case 'date':
+          $date = date_format(date_now(), DATE_FORMAT_ISO);
+          $date_placeholder = "'%s'";
+          break;
+          
+        case 'datetime':
+          $date = date_format(date_now(), DATE_FORMAT_DATETIME);
+          $date_placeholder = "'%s'";
+          break;
+        
+        case 'datestamp':
+          $date = date_format(date_now(), DATE_FORMAT_UNIX);
+          $date_placeholder = "%d";
+          break;
+        
+        default:
+          continue;
+      }
+      
       // Find all nodes whose date has passed
-      if ($field['type'] == 'date') {
-        $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column <= '%s'", date_format(date_now(), DATE_FORMAT_ISO));
-      }
-      else if ($field['type'] == 'datetime') {
-        $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column <= '%s'", date_format(date_now(), DATE_FORMAT_DATETIME));
-      }
-      else {
-        $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column <= %d", date_format(date_now(), DATE_UNIX));
-      }
-      while ($nid = db_result($result)) {
-        $node = node_load($nid);
+      $result = db_query("SELECT f.nid, f.$column AS value FROM {$table} f LEFT JOIN {date_trigger_invocation} i ON i.nid = f.nid AND i.field_name = '%s' AND i.{$field_type}_value = f.$column WHERE f.$column <= $date_placeholder AND i.{$field_type}_value IS NULL", $field_name, $date);
+      while ($record = db_fetch_object($result)) {
+        $node = node_load($record->nid);
 
         // Trigger the event
         rules_invoke_event($event_name, $node);
+
+        // Make sure we don't trigger it again
+        db_query("DELETE FROM {date_trigger_invocation} WHERE nid = %d AND field_name = '%s'", $record->nid, $field_name);
+        db_query("INSERT INTO {date_trigger_invocation} (nid, field_name, {$field_type}_value) VALUES (%d, '%s', $date_placeholder)", $record->nid, $field_name, $record->value);
       }
     }
   }
@@ -61,8 +79,7 @@ function date_trigger_rules_event_info() {
     }
     
     $events[$event_name] = array(
-      // TODO: Change to 'Once after ... has passed' when appropriate
-      'label' => t('After \'@field_label\' has passed', array('@field_label' => $field_label)),
+      'label' => t('Once after \'@field_label\' has passed', array('@field_label' => $field_label)),
       'module' => 'Date trigger',
       'arguments' => array(
         'node' => array(
