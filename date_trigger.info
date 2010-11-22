@@ -1,0 +1,8 @@
+; Developed by Dennis Stevense for Digital Deployment
+name = Date trigger
+description = Fires an event when the date in a date field on a node has passed. Use the Trigger module to attach actions to the event.
+version = 6.x-1.x-dev
+core = 6.x
+
+dependencies[] = date
+dependencies[] = rules

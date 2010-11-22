@@ -1,0 +1,104 @@
+<?php
+// Developed by Dennis Stevense for Digital Deployment
+
+/**
+ * Implementation of hook_cron().
+ */
+function date_trigger_cron() {
+  // Iterate all date fields
+  $fields = date_trigger_fields();
+  foreach ($fields as $field) {
+    $event_name = date_trigger_event_name($field);
+
+    // Check if there are any rules for this event, so that we don't go query the database for nothing
+    $set = rules_get_rule_set('event_' . $event_name);
+    if (isset($set['rules']) && !empty($set['rules'])) {
+      $database_info = content_database_info($field);
+      if (!isset($database_info['table']) || !isset($database_info['columns']['value']['column'])) {
+        continue;
+      }
+
+      // Find all nodes whose date has passed
+      $table = $database_info['table'];
+      $column = $database_info['columns']['value']['column'];
+      $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column < %d", time());
+      while ($nid = db_result($result)) {
+        $node = node_load($nid);
+
+        // Trigger the event
+        rules_invoke_event($event_name, $node);
+      }
+    }
+  }
+}
+
+/**
+ * Implementation of hook_rules_event_info().
+ */
+function date_trigger_rules_event_info() {
+  $events = array();
+  
+  // Iterate all date fields
+  $fields = date_trigger_fields();
+  foreach ($fields as $field) {
+    $event_name = date_trigger_event_name($field);
+    
+    // Find an appropriate human-readable name for the field
+    if (isset($field['widget']['label'])) {
+      $field_label = $field['widget']['label'];
+    }
+    else {
+      $field_label = $field['field_name'];
+    }
+    
+    $events[$event_name] = array(
+      // TODO: Change to 'Once after ... has passed' when appropriate
+      'label' => t('After \'@field_label\' has passed', array('@field_label' => $field_label)),
+      'module' => 'Date trigger',
+      'arguments' => array(
+        'node' => array(
+          'type' => 'node', 
+          'label' => t('content on which date has passed'),
+        ),
+      ),
+    );
+  }
+  
+  return $events;
+}
+
+/**
+ * Returns the rules event name for the given field.
+ */
+function date_trigger_event_name($field) {
+  return 'date_trigger_' . $field['field_name'];
+}
+
+/**
+ * Returns the fields that this module supports.
+ */
+function date_trigger_fields() {
+  static $fields;
+  
+  // Establish the array if we don't have cached statically
+  if (!isset($fields)) {
+    $fields = array();
+    
+    // Iterate all fields
+    $all_fields = content_fields();
+    foreach ($all_fields as $field) {
+      // We need to check this, according to the content_fields() documentation
+      if (!isset($field['field_name']) || empty($field['field_name'])) {
+        continue;
+      }
+
+      // Check if this is a date field
+      // TODO: Support 'date' and 'datetime' fields
+      if ($field['type'] == 'datestamp') {
+        $fields[] = $field;
+      }
+    }
+  }
+
+  return $fields;
+}
