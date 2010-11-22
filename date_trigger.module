@@ -18,10 +18,19 @@ function date_trigger_cron() {
         continue;
       }
 
-      // Find all nodes whose date has passed
       $table = $database_info['table'];
       $column = $database_info['columns']['value']['column'];
-      $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column < %d", time());
+
+      // Find all nodes whose date has passed
+      if ($field['type'] == 'date') {
+        $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column <= '%s'", date_format(date_now(), DATE_FORMAT_ISO));
+      }
+      else if ($field['type'] == 'datetime') {
+        $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column <= '%s'", date_format(date_now(), DATE_FORMAT_DATETIME));
+      }
+      else {
+        $result = db_query("SELECT f.nid FROM {$table} f WHERE f.$column <= %d", date_format(date_now(), DATE_UNIX));
+      }
       while ($nid = db_result($result)) {
         $node = node_load($nid);
 
@@ -93,8 +102,7 @@ function date_trigger_fields() {
       }
 
       // Check if this is a date field
-      // TODO: Support 'date' and 'datetime' fields
-      if ($field['type'] == 'datestamp') {
+      if (in_array($field['type'], array('date', 'datestamp', 'datetime'))) {
         $fields[] = $field;
       }
     }
