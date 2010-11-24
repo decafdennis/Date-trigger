@@ -44,7 +44,7 @@ function date_trigger_cron() {
       }
       
       // Find all nodes whose date has passed
-      $result = db_query("SELECT f.nid, f.$column AS value FROM {$table} f LEFT JOIN {date_trigger_invocation} i ON i.nid = f.nid AND i.field_name = '%s' AND i.{$field_type}_value = f.$column WHERE f.$column <= $date_placeholder AND i.{$field_type}_value IS NULL", $field_name, $date);
+      $result = db_query("SELECT f.nid, f.$column AS value FROM {{$table}} f LEFT JOIN {date_trigger_invocation} i ON i.nid = f.nid AND i.field_name = '%s' AND i.{$field_type}_value = f.$column WHERE f.$column <= $date_placeholder AND i.{$field_type}_value IS NULL", $field_name, $date);
       while ($record = db_fetch_object($result)) {
         $node = node_load($record->nid);
 
