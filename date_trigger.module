@@ -94,6 +94,17 @@ function date_trigger_rules_event_info() {
 }
 
 /**
+ * Implementation of hook_content_fieldapi().
+ */
+function date_trigger_content_fieldapi($op, $field) {
+  // Clear the statically cached fields
+  date_trigger_fields(TRUE);
+  
+  // Do the same for the rules
+  rules_gather_data('rules_event_info', NULL, NULL, TRUE);
+}
+
+/**
  * Returns the rules event name for the given field.
  */
 function date_trigger_event_name($field) {
@@ -103,8 +114,14 @@ function date_trigger_event_name($field) {
 /**
  * Returns the fields that this module supports.
  */
-function date_trigger_fields() {
+function date_trigger_fields($_reset = FALSE) {
   static $fields;
+  
+  // Just reset if necessary
+  if ($_reset) {
+    $fields = NULL;
+    return NULL;
+  }
   
   // Establish the array if we don't have cached statically
   if (!isset($fields)) {
