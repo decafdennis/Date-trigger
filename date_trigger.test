@@ -1,0 +1,154 @@
+<?php
+// Developed by Dennis Stevense for Digital Deployment
+
+class DateTriggerTestCase extends DrupalWebTestCase {
+  
+  const ONE_HOUR_IN_SECONDS = 3600;
+
+  public static function getInfo() {
+    return array(
+      'name' => t('Date trigger functionality'),
+      'description' => t('Triggers with various types of date fields.'),
+      'group' => t('Date trigger'),
+    );
+  }
+  
+  public function setUp() {
+    parent::setUp('content', 'date_api', 'date_timezone', 'date', 'rules', 'date_trigger', 'date_trigger_test');
+    
+    module_load_include('inc', 'content', 'includes/content.crud');
+  }
+  
+  public function testDateField() {
+    list($type_name, $field_name) = $this->acquireContentTypeAndDateField('date');
+    $node = $this->acquireNode($type_name);
+    $this->assertDateTriggerIsWorking($node, $field_name);
+  }
+  
+  public function testDatetimeField() {
+    list($type_name, $field_name) = $this->acquireContentTypeAndDateField('datetime');
+    $node = $this->acquireNode($type_name);
+    $this->assertDateTriggerIsWorking($node, $field_name);
+  }
+  
+  public function testDatestampField() {
+    list($type_name, $field_name) = $this->acquireContentTypeAndDateField('datestamp');
+    $node = $this->acquireNode($type_name);
+    $this->assertDateTriggerIsWorking($node, $field_name);
+  }
+  
+  /**
+   * Asserts that the date trigger is working for the given node and field name.
+   *
+   * @param $node The node to test on.
+   * @param $field_name The field to test on.
+   */
+  protected function assertDateTriggerIsWorking($node, $field_name) {
+    // Clear the test stack
+    date_trigger_test_clear_nids();
+    
+    // Set a date in the future and check that our test action is not triggered
+    $this->setNodeDate($node, $field_name, self::ONE_HOUR_IN_SECONDS);
+    $this->assertTrue(drupal_cron_run(), t('Cron run successfully with date in the future'));
+    $this->assertNull(date_trigger_test_pop_nid(), t('No nodes have been triggered'));
+    
+    // Set a date in the past and check that our test action is triggered
+    $this->setNodeDate($node, $field_name, -self::ONE_HOUR_IN_SECONDS);
+    $this->assertTrue(drupal_cron_run(), t('Cron run successfully with date in the past'));
+    $this->assertEqual(date_trigger_test_pop_nid(), $node->nid, t('Node has been triggered'));
+    $this->assertNull(date_trigger_test_pop_nid(), t('No more nodes have been triggered'));
+    
+    // Don't change date and check that our test action is not triggered again
+    $this->assertTrue(drupal_cron_run(), t('Cron run successfully with same date'));
+    $this->assertNull(date_trigger_test_pop_nid(), t('No nodes have been triggered'));
+    
+    // Set a (different) date in the past again and check that our test action is triggered
+    $this->setNodeDate($node, $field_name, -2 * self::ONE_HOUR_IN_SECONDS);
+    $this->assertTrue(drupal_cron_run(), t('Cron run successfully with another date in the past'));
+    $this->assertEqual(date_trigger_test_pop_nid(), $node->nid, t('Node has been triggered'));
+    $this->assertNull(date_trigger_test_pop_nid(), t('No more nodes have been triggered'));
+  }
+  
+  /**
+   * Creates a content type with a date field and a rule that is triggered when a date on that field has passed.
+   *
+   * @param $field_type The type of date field to create (one of: date, datetime, datestamp).
+   *
+   * @return An array containing the name of the content type and the name of the date field, in that order.
+   */
+  protected function acquireContentTypeAndDateField($field_type) {
+    // Create a random content type
+    $type = $this->drupalCreateContentType();
+
+    // Add a date field of the right type 
+    $field = array(
+      'field_name' => $this->randomName(),
+      'type_name' => $type->name,
+      'type' => $field_type,
+      'widget_type' => 'date_text',
+      'granularity' => array('year', 'month', 'day', 'hour', 'minute', 'second'),
+    );
+    $field = content_field_instance_create($field);
+
+    // Ensure a rules event became available for the date field
+    $events = rules_get_events();
+    $this->assertTrue(isset($events[date_trigger_event_name($field)]), t('Rules event for date field became available'));
+    
+    // Add a rule that will trigger our special testing action
+    $rule_name = $this->randomName();
+    $rule = array(
+      '#type' => 'rule',
+      '#name' => $rule_name,
+      '#label' => 'Push the node onto stack when dat (for testing purposes)',
+      '#set' => 'event_' . date_trigger_event_name($field),
+      '#active' => 1,
+      '#status' => 'custom',
+      '#actions' => array(
+        rules_use_action('date_trigger_test_push_nid', array(
+          '#settings' => array(
+            '#argument map' => array('node' => 'node'),
+          ),
+        )),
+      ),
+    );
+    rules_item_save('rules', $rule_name, $rule);
+    rules_clear_cache();
+    
+    return array($type->name, $field['field_name']);
+  }
+  
+  /**
+   * Creates a node of the given type.
+   *
+   * @param $type_name The content type of the node to create.
+   *
+   * @return A node object.
+   */
+  protected function acquireNode($type_name) {
+    return $this->drupalCreateNode(array(
+      'type' => $type_name,
+      'title' => $this->randomString(),
+      'body' => $this->randomString(),
+    ));
+  }
+  
+  /**
+   * Sets the given field to the given date.
+   *
+   * @param &$node The node to set the date on.
+   * @param $field_name The date field to set.
+   * @param $delta The date field will be set to the current time plus this delta (defaults to 0).
+   */
+  protected function setNodeDate(&$node, $field_name, $delta = 0) {
+    // Get a reference to the field we need to set
+    $field_value = &$node->$field_name;
+
+    // Create a date object and format it to set the field value
+    $date = date_make_date(time() + $delta, NULL, DATE_UNIX);
+    $field_value[0]['value'] = date_format($date, date_type_format($field_value[0]['date_type']));
+
+    // Save the node
+    node_save($node);
+  }
+
+}

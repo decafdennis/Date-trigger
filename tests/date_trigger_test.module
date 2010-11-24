@@ -1,0 +1,63 @@
+<?php
+// Developed by Dennis Stevense for Digital Deployment
+
+/**
+ * Implementation of hook_rules_action_info().
+ */
+function date_trigger_test_rules_action_info() {
+  $actions = array();
+  
+  $actions['date_trigger_test_push_nid'] = array(
+    'label' => t('Push the node onto stack (for testing purposes)'),
+    'module' => 'Date trigger tests',
+    'arguments' => array(
+      'node' => array(
+        'label' => t('Content'),
+        'type' => 'node',
+      ),
+    ),
+    'base' => 'date_trigger_test_rules_action_push_nid',
+  );
+  
+  return $actions;
+}
+
+/**
+ * Callback for the date_trigger_test_push_nid rules action. Pushes the nid of the given node on the global stack.
+ */
+function date_trigger_test_rules_action_push_nid($node) {
+  date_trigger_test_push_nid($node->nid);
+}
+
+/**
+ * Pushes the given nid on the global stack.
+ */
+function date_trigger_test_push_nid($nid) {
+  global $date_trigger_test_nid_stack;
+  
+  if (!isset($date_trigger_test_nid_stack)) {
+    $date_trigger_test_nid_stack = array();
+  }
+  
+  array_push($date_trigger_test_nid_stack, $nid);
+}
+
+/**
+ * Pops an nid from the global stack.
+ */
+function date_trigger_test_pop_nid() {
+  global $date_trigger_test_nid_stack;
+  
+  if (isset($date_trigger_test_nid_stack)) {
+    return array_pop($date_trigger_test_nid_stack);
+  }
+}
+
+/**
+ * Clears the global stack.
+ */
+function date_trigger_test_clear_nids() {
+  global $date_trigger_test_nid_stack;
+  
+  $date_trigger_test_nid_stack = array();
+}

@@ -1,0 +1,9 @@
+; Developed by Dennis Stevense for Digital Deployment
+name = Date trigger tests
+description = Support module for date trigger related testing.
+package = Testing
+version = 6.x-1.x-dev
+core = 6.x
+hidden = TRUE
+
+dependencies[] = rules
