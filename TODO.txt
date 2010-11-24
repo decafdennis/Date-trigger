@@ -1,0 +1,1 @@
+* Clean up date_trigger_invocation table when a node and/or date field is deleted
